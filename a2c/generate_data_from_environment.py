@@ -1,7 +1,8 @@
 import numpy as np
 from mlagents_envs.base_env import ActionTuple
 
-def generate_data_from_environment(policy, env, num_episodes, save_path):
+
+def generate_data_from_environment(policy, env, num_episodes, writer, step, save_path):
   """
   num_episodes (int): The number of episodes to collect data for.
   in the case of many agents, the number of episodes is the total number of episodes across all agents.
@@ -14,6 +15,7 @@ def generate_data_from_environment(policy, env, num_episodes, save_path):
   transition_tuples = {}
   env.reset()
   print("Collecting data")
+  action_indexes = []
   while episode_idx < num_episodes:
       decision_steps, terminal_steps = env.get_steps(behavior_name)
 
@@ -34,7 +36,8 @@ def generate_data_from_environment(policy, env, num_episodes, save_path):
 
           # print(f"Agent {agent_id} has received a decision step reward of {reward}.")
           # TODO: we can batch the actions across many agents for efficiency.
-          actions = policy(observation)
+          action_index, actions = policy(observation)
+          action_indexes.append(action_index)
           
           # actions = np.random.uniform(low=-1, high=1, size=(num_agents, 2))
           action_tuple = ActionTuple(continuous=actions)
@@ -80,6 +83,8 @@ def generate_data_from_environment(policy, env, num_episodes, save_path):
       env.step() 
 
   print("Data collected")
+  writer.add_histogram('data collection action values', np.array(action_indexes), step, bins=np.arange(-0.5, 256.5, 1))
+  
   return replay_buffer
 
   
