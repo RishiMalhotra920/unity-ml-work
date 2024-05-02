@@ -3,7 +3,7 @@ import torch
 
 
 
-q_network = NeuralNet(10, 20, 20, 1) # [s, a] -> r
+q_network = NeuralNet(10, 20, 20, 20, 1) # [s, a] -> r
 
 
 def load_q_network(file_path=None):
