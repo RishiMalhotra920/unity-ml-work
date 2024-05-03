@@ -1,11 +1,12 @@
 from a2c.neural_net import NeuralNet
 import torch
 
+NUM_ACTIONS = 256
+
+pi_network = NeuralNet(8, 20, 20, NUM_ACTIONS) # [s] -> a
 
 
-q_network = NeuralNet(10, 20, 20, 20, 1) # [s, a] -> r
+def load_pi_network(file_path=None):
+  pi_network.load_state_dict(torch.load(file_path))
+  return pi_network
 
-
-def load_q_network(file_path=None):
-  q_network.load_state_dict(torch.load(file_path))
-  return q_network
