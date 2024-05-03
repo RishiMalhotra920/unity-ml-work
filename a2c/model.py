@@ -1,9 +1,9 @@
 from a2c.neural_net import NeuralNet
 import torch
 
-NUM_ACTIONS = 256
+# NUM_ACTIONS = 32*32
 
-pi_network = NeuralNet(8, 20, 20, NUM_ACTIONS) # [s] -> a
+pi_network = NeuralNet(8, 20, 20, 4) # [s] -> a
 
 
 def load_pi_network(file_path=None):

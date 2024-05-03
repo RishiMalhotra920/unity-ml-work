@@ -21,11 +21,11 @@ def generate_data_from_environment(policy, env, num_episodes, max_episode_length
       decision_steps, terminal_steps = env.get_steps(behavior_name)
 
       # Generate the action array based on the number of active agents
-      print('transition_tuples', transition_tuples)
+      # print('transition_tuples', transition_tuples)
       for agent_id, decision_step in decision_steps.items():
 
           if len(episode_memory.get(agent_id, [])) > max_episode_length:
-            print('episode memory reached max length for agent_id: ', agent_id)
+            # print('episode memory reached max length for agent_id: ', agent_id)
             replay_buffer.append(episode_memory[agent_id])
             del episode_memory[agent_id]
             del transition_tuples[agent_id]
@@ -78,7 +78,7 @@ def generate_data_from_environment(policy, env, num_episodes, max_episode_length
       env.step() 
 
   print("Data collected")
-  writer.add_histogram('data collection action values', np.array(action_indexes), step, bins=np.arange(-0.5, 256.5, 1))
+  writer.add_histogram('data collection action values', np.array(action_indexes), step, bins=np.arange(-0.5, 32*32+5, 1))
   writer.add_scalar("average episode length", np.mean([len(episode) for episode in replay_buffer]), step)
 
   if save_path != None:

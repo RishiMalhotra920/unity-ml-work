@@ -2,7 +2,6 @@ import torch
 from torch import nn
 import random
 import numpy  as np 
-from a2c.inference import get_index_from_action
 
 def train(data, pi_network, gamma, lr, num_epochs, writer, step, save_path):
     
@@ -30,26 +29,30 @@ def train(data, pi_network, gamma, lr, num_epochs, writer, step, save_path):
 
                 G = r + gamma*G #this computation is duplicated per epoch, but it's fine for now
                 # Forward pass
-                a_logits = pi_network(s)
+                logits = pi_network(s)
+                print('this is logits', logits)
+                a1_mean, a2_mean, a1_var, a2_var = logits
+                a1_var = torch.exp(a1_var)
+                a2_var = torch.exp(a2_var)
 
-                # print('a_logits', a_logits, a_logits.shape)
-                # input()
 
-                # log softmax more stable due to the log sum exp trick.
-                a_disbn = torch.log_softmax(a_logits, dim=0) 
+                actual_a1, actual_a2 = torch.tensor(a[0][0]), torch.tensor(a[0][1])
 
-                # print('this is a', a)
+                pi_a_given_s = torch.distributions.Normal(a1_mean, a1_var).log_prob(actual_a1) + torch.distributions.Normal(a2_mean, a2_var).log_prob(actual_a2)
+
+
                 # a is a vector of one action.
-                index = get_index_from_action(a[0])
-                pi_a_given_s = a_disbn[index]
+                # index = get_index_from_action(a[0])
+                # pi_a_given_s = a_disbn[index]
+                # print("index", index, len(a_disbn))
                 # print('this is the pi_a_given_s', index, pi_a_given_s)
 
-                print('this is a_disbn', a_disbn)
+                # print('this is a_disbn', a_disbn)
 
                 steps_to_go = len(episode) - 1 - t #good save by gpt
                 loss = -(gamma**steps_to_go) * G * pi_a_given_s #add a negative sign to minimize the negative...
 
-                print('this is the loss', loss, gamma, G, pi_a_given_s)
+                # print('this is the loss', loss, gamma, G, pi_a_given_s)
 
                 optimizer.zero_grad()
                 loss.backward()

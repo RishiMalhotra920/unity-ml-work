@@ -44,8 +44,9 @@ if __name__ == "__main__":
   epsilon = 1.0
   epsilon_decay = 0.99
   max_episode_length = 10
-  max_episode_length_increase = 1.2
+  max_episode_length_increase = 1.01
   top_max_episode_length = 100
+  lr_decay = 0.99
 
   writer = SummaryWriter(f"runs/{run_id}")
 
@@ -58,12 +59,13 @@ if __name__ == "__main__":
     print(f"====rl loop step {rl_loop_step}====")
     
     policy = lambda x: infer(pi_network, x, epsilon)
-    data = generate_data_from_environment(policy, env, num_episodes=num_episodes_for_data_generation, max_episode_length=max_episode_length, writer=writer, step=rl_loop_step, save_path=dataset_dir / f"step_{rl_loop_step}.txt")
+    data = generate_data_from_environment(policy, env, num_episodes=num_episodes_for_data_generation, max_episode_length=int(max_episode_length), writer=writer, step=rl_loop_step, save_path=dataset_dir / f"step_{rl_loop_step}.txt")
     pi_network = train(data, pi_network, gamma, lr, num_epochs, writer, rl_loop_step, checkpoints_dir / f"step_{rl_loop_step}.pth")
 
-    max_episode_length = min(top_max_episode_length, int(max_episode_length * max_episode_length_increase))
+    max_episode_length = min(top_max_episode_length, max_episode_length * max_episode_length_increase)
     epsilon = max(epsilon_min, epsilon * epsilon_decay)
-    writer.add_scalar("max_episode_length", max_episode_length, rl_loop_step)
+    lr = max(lr * lr_decay, 0.00001)
+    writer.add_scalar("max_episode_length", int(max_episode_length), rl_loop_step)
     writer.add_scalar("epsilon", epsilon, rl_loop_step)
     # num_episodes_for_data_generation = max(50, int(num_episodes_for_data_generation * num_episodes_for_data_generation_decay))
     # epsilon = max(epsilon_min, epsilon * epsilon_decay)
