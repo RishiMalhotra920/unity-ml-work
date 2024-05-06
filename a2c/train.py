@@ -1,24 +1,25 @@
 import torch
 from torch import nn
 import random
-import numpy  as np 
+import numpy as np
 
-def train(data, pi_network, gamma, lr, num_epochs, writer, step, save_path):
+def train(data, pi_network, v_network, gamma, lr, num_epochs, writer, step, save_path):
+    # Define the loss functions
+    pi_criterion = nn.MSELoss()
+    v_criterion = nn.MSELoss()
     
-    # Define the loss function
-    criterion = nn.MSELoss()
-    # Define the optimizer
-    optimizer = torch.optim.Adam(pi_network.parameters(), lr=lr)
+    # Define the optimizers
+    pi_optimizer = torch.optim.Adam(pi_network.parameters(), lr=lr)
+    v_optimizer = torch.optim.Adam(v_network.parameters(), lr=lr)
 
     print("Training...")
-    # there should be a dataset, dataloader and what not here
-    # Train the network
-    
+
     # shuffle the order of data
-    random.shuffle(data) #shuffle whole trajectories, maintaining the order of each trajectory
+    random.shuffle(data) # shuffle whole trajectories, maintaining the order of each trajectory
 
     for epoch in range(num_epochs):
-        total_loss = 0
+        total_pi_loss = 0
+        total_v_loss = 0
         num_updates = 0
         total_G = 0
         for episode in data:
@@ -27,51 +28,51 @@ def train(data, pi_network, gamma, lr, num_epochs, writer, step, save_path):
                 (s, a, r, s_prime) = episode[t]
                 s = torch.from_numpy(s).float()
 
-                G = r + gamma*G #this computation is duplicated per epoch, but it's fine for now
-                # Forward pass
-                logits = pi_network(s)
-                print('this is s', s)
-                print('this is logits', logits)
-                a1_mean, a2_mean, a1_var, a2_var = logits
+                G = r + gamma * G
+                # Compute value for the current state
+                v_s = v_network(s)
+                
+                # Forward pass for the policy network
+                (a1_mean, a2_mean), (a1_var, a2_var) = pi_network(s)
                 softplus = torch.nn.Softplus()
                 a1_var = softplus(a1_var)
                 a2_var = softplus(a2_var)
 
-
                 actual_a1, actual_a2 = torch.tensor(a[0][0]), torch.tensor(a[0][1])
-
                 pi_a_given_s = torch.distributions.Normal(a1_mean, a1_var).log_prob(actual_a1) + torch.distributions.Normal(a2_mean, a2_var).log_prob(actual_a2)
 
+                # Adjusted return with baseline
+                adjusted_G = G - v_s.detach()  # detach v_s to avoid computing gradients for it
 
-                # a is a vector of one action.
-                # index = get_index_from_action(a[0])
-                # pi_a_given_s = a_disbn[index]
-                # print("index", index, len(a_disbn))
-                # print('this is the pi_a_given_s', index, pi_a_given_s)
+                # Loss for the policy network
+                steps_to_go = len(episode) - 1 - t
+                pi_loss = -(gamma**steps_to_go) * adjusted_G * pi_a_given_s
 
-                # print('this is a_disbn', a_disbn)
+                # Loss for the value network
+                v_loss = v_criterion(v_s, torch.tensor([G], dtype=torch.float32))
 
-                steps_to_go = len(episode) - 1 - t #good save by gpt
-                loss = -(gamma**steps_to_go) * G * pi_a_given_s #add a negative sign to minimize the negative...
+                # Update policy network
+                pi_optimizer.zero_grad()
+                pi_loss.backward()
+                pi_optimizer.step()
 
-                # print('this is the loss', loss, gamma, G, pi_a_given_s)
+                # Update value network
+                v_optimizer.zero_grad()
+                v_loss.backward()
+                v_optimizer.step()
 
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                total_loss += loss.item()
+                total_pi_loss += pi_loss.item()
+                total_v_loss += v_loss.item()
                 num_updates += 1
-            
-            total_G += G
-            
-        
-        avg_loss = total_loss / num_updates
-        
-        step_epoch = step*num_epochs + epoch
-        writer.add_scalar('episode return', total_G/len(data), step_epoch)
-        writer.add_scalar('training loss', avg_loss, step_epoch)
 
-        
+            total_G += G
+
+        avg_pi_loss = total_pi_loss / num_updates
+        avg_v_loss = total_v_loss / num_updates
+        step_epoch = step * num_epochs + epoch
+        writer.add_scalar('episode return', total_G / len(data), step_epoch)
+        writer.add_scalar('training loss', avg_pi_loss, step_epoch)
+        writer.add_scalar('value loss', avg_v_loss, step_epoch)
 
     print('Finished Training')
     print(f"Writing model to {save_path}")

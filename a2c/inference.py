@@ -52,9 +52,8 @@ def infer(pi_network, observation, epsilon=0, mode='sample'):
             # obs = torch.from_numpy(np.array(observation)).float()
             obs = torch.tensor(observation, dtype=torch.float32)
 
-            logits = pi_network(obs)
+            (a1_mean, a2_mean), (a1_var, a2_var) = pi_network(obs)
 
-            a1_mean, a2_mean, a1_var, a2_var = logits
             softplus = torch.nn.Softplus()
             a1_var = softplus(a1_var)
             a2_var = softplus(a2_var)
