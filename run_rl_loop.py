@@ -33,20 +33,23 @@ if __name__ == "__main__":
   checkpoints_dir = Path("checkpoints")
   dataset_dir = Path("datasets")
 
-  gamma = 0.95
+  gamma = 0.99
   num_steps_in_rl_loop = 500
   num_epochs = 1
-  num_episodes_for_data_generation=12
+  num_episodes_for_data_generation_per_agent=1
   # num_episode_per_agent = 1
   # num_episodes_for_data_generation_decay = 0.8
-  lr = 0.0001
+  pi_network_lr = 1e-8
+  v_network_lr = 1e-3
+  lr_min = 1e-10
   epsilon_min = 0.1 
   epsilon = 1.0
-  epsilon_decay = 0.999
-  max_episode_length = 10
-  max_episode_length_increase = 1.01
+  epsilon_decay = 0.99
+  max_episode_length = 1000
+  # max_episode_length_increase = 1.01
   top_max_episode_length = 100
   lr_decay = 0.99
+  num_agents = 12
 
   writer = SummaryWriter(f"runs/{run_id}")
 
@@ -57,20 +60,22 @@ if __name__ == "__main__":
 
   # epsilon annealing formula
   # epsilon = 1 - 0.9 * (t/1m)
-  
+  assert num_agents == 12 #note you have to change this in the unity env as well.
   for rl_loop_step in range(num_steps_in_rl_loop):
     print(f"====rl loop step {rl_loop_step}====")
     
     policy = lambda x: infer(pi_network, x, epsilon)
-    data = generate_data_from_environment(policy, env, num_episodes=num_episodes_for_data_generation, max_episode_length=int(max_episode_length), writer=writer, step=rl_loop_step, save_path=dataset_dir / f"step_{rl_loop_step}.txt")
-    pi_network = train(data, pi_network, v_network, gamma, lr, num_epochs, writer, rl_loop_step, checkpoints_dir / f"step_{rl_loop_step}.pth")
+    data = generate_data_from_environment(policy, env, num_agents, num_episodes_per_agent=num_episodes_for_data_generation_per_agent, max_episode_length=int(max_episode_length), writer=writer, step=rl_loop_step, save_path=dataset_dir / f"step_{rl_loop_step}.txt")
+    pi_network = train(data, pi_network, v_network, gamma, pi_network_lr, v_network_lr, num_epochs, writer, rl_loop_step, checkpoints_dir / f"step_{rl_loop_step}.pth")
 
     # max_episode_length = min(top_max_episode_length, max_episode_length * max_episode_length_increase)
     # epsilon = max(epsilon_min, epsilon * epsilon_decay)
     epsilon = max(epsilon_min, epsilon * epsilon_decay)
-    max_episode_length = min(top_max_episode_length, max_episode_length * max_episode_length_increase)
-    lr = max(lr * lr_decay, 0.00001)
-    writer.add_scalar("lr", lr, rl_loop_step)
+    # max_episode_length = min(top_max_episode_length, max_episode_length * max_episode_length_increase)
+    pi_network_lr = max(pi_network_lr * lr_decay, lr_min)
+    v_network_lr = max(v_network_lr * lr_decay, lr_min)
+    writer.add_scalar("pi_network_lr", pi_network_lr, rl_loop_step)
+    writer.add_scalar("v_network_lr", v_network_lr, rl_loop_step)
     writer.add_scalar("max_episode_length", int(max_episode_length), rl_loop_step)
     writer.add_scalar("epsilon", epsilon, rl_loop_step)
     # num_episodes_for_data_generation = max(50, int(num_episodes_for_data_generation * num_episodes_for_data_generation_decay))

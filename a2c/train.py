@@ -3,14 +3,14 @@ from torch import nn
 import random
 import numpy as np
 
-def train(data, pi_network, v_network, gamma, lr, num_epochs, writer, step, save_path):
+def train(data, pi_network, v_network, gamma, pi_network_lr, v_network_lr, num_epochs, writer, step, save_path):
     # Define the loss functions
     pi_criterion = nn.MSELoss()
     v_criterion = nn.MSELoss()
     
     # Define the optimizers
-    pi_optimizer = torch.optim.Adam(pi_network.parameters(), lr=lr)
-    v_optimizer = torch.optim.Adam(v_network.parameters(), lr=lr)
+    pi_optimizer = torch.optim.Adam(pi_network.parameters(), lr=pi_network_lr)
+    v_optimizer = torch.optim.Adam(v_network.parameters(), lr=v_network_lr)
 
     print("Training...")
 
@@ -23,7 +23,15 @@ def train(data, pi_network, v_network, gamma, lr, num_epochs, writer, step, save
         num_updates = 0
         total_G = 0
         for episode in data:
-            G = 0
+            last_reward = episode[-1][2]
+            if last_reward == -1:
+                G = 0
+                print('not bootstrapping... G:', G)
+            else:
+                s_last = torch.from_numpy(episode[-1][3]).float()
+                G = v_network(s_last).detach().item()
+                print('bootstrapping... G:', G)
+
             for t in range(len(episode)-1, -1, -1):
                 (s, a, r, s_prime) = episode[t]
                 s = torch.from_numpy(s).float()
