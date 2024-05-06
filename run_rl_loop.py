@@ -33,18 +33,18 @@ if __name__ == "__main__":
   checkpoints_dir = Path("checkpoints")
   dataset_dir = Path("datasets")
 
-  gamma = 0.95
-  num_steps_in_rl_loop = 500
+  gamma = 0.95 #good one 0.95
+  num_steps_in_rl_loop = 2000
   num_epochs = 1
   num_episodes_for_data_generation=12
   # num_episode_per_agent = 1
   # num_episodes_for_data_generation_decay = 0.8
-  lr = 0.0001
+  lr = 1e-8
   epsilon_min = 0.1 
   epsilon = 1.0
-  epsilon_decay = 0.99
-  max_episode_length = 10
-  max_episode_length_increase = 1.01
+  epsilon_decay = 0.0010
+  max_episode_length = 100 #good value 10
+  # max_episode_length_increase = 1.01
   top_max_episode_length = 100
   lr_decay = 0.99
 
@@ -62,8 +62,9 @@ if __name__ == "__main__":
     data = generate_data_from_environment(policy, env, num_episodes=num_episodes_for_data_generation, max_episode_length=int(max_episode_length), writer=writer, step=rl_loop_step, save_path=dataset_dir / f"step_{rl_loop_step}.txt")
     pi_network = train(data, pi_network, gamma, lr, num_epochs, writer, rl_loop_step, checkpoints_dir / f"step_{rl_loop_step}.pth")
 
-    max_episode_length = min(top_max_episode_length, max_episode_length * max_episode_length_increase)
-    epsilon = max(epsilon_min, epsilon * epsilon_decay)
+    # max_episode_length = min(top_max_episode_length, max_episode_length * max_episode_length_increase)
+    # epsilon = max(epsilon_min, epsilon * epsilon_decay)
+    epsilon = max(epsilon_min, epsilon - epsilon_decay )
     lr = max(lr * lr_decay, 0.00001)
     writer.add_scalar("max_episode_length", int(max_episode_length), rl_loop_step)
     writer.add_scalar("epsilon", epsilon, rl_loop_step)

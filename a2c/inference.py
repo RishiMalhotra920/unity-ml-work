@@ -55,8 +55,9 @@ def infer(pi_network, observation, epsilon=0, mode='sample'):
             logits = pi_network(obs)
 
             a1_mean, a2_mean, a1_var, a2_var = logits
-            a1_var = torch.exp(a1_var)
-            a2_var = torch.exp(a2_var)
+            softplus = torch.nn.Softplus()
+            a1_var = softplus(a1_var)
+            a2_var = softplus(a2_var)
             
             if mode == 'greedy':
                 # index = np.argmax(action_disbn)

@@ -30,10 +30,12 @@ def train(data, pi_network, gamma, lr, num_epochs, writer, step, save_path):
                 G = r + gamma*G #this computation is duplicated per epoch, but it's fine for now
                 # Forward pass
                 logits = pi_network(s)
+                print('this is s', s)
                 print('this is logits', logits)
                 a1_mean, a2_mean, a1_var, a2_var = logits
-                a1_var = torch.exp(a1_var)
-                a2_var = torch.exp(a2_var)
+                softplus = torch.nn.Softplus()
+                a1_var = softplus(a1_var)
+                a2_var = softplus(a2_var)
 
 
                 actual_a1, actual_a2 = torch.tensor(a[0][0]), torch.tensor(a[0][1])
