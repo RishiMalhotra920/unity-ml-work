@@ -1,16 +1,30 @@
 import gym
-
+import mlagents_envs
 # from baselines import deepq
 # from baselines import logger
+from stable_baselines3 import A2C
+from stable_baselines3.common.env_util import make_vec_env
+from gym_trainer.a2c import MyA2C
 
 from mlagents_envs.environment import UnityEnvironment
 from mlagents_envs.envs.unity_gym_env import UnityToGymWrapper
+from torch.utils.tensorboard import SummaryWriter
+import sys
 
+def main(run_id):
+  # unity_env = UnityEnvironment("/Users/rishimalhotra/projects/checker2_one_agent.app")
+  unity_env = UnityEnvironment()
+  vec_env = UnityToGymWrapper(unity_env, uint8_visual=True)
+  print('hi', vec_env._observation_space, isinstance(vec_env.action_space, gym.spaces.Box), vec_env.action_space)
+  writer = SummaryWriter(f"runs/{run_id}")
+  print('run id: ', run_id)
 
-def main():
-  unity_env = UnityEnvironment("/Users/rishimalhotra/projects/checker.app")
-  env = UnityToGymWrapper(unity_env, uint8_visual=True)
-  logger.configure('./logs')  # Change to log in a different directory
+  model = MyA2C(vec_env, writer)
+  model.learn(total_timesteps=25000, policy_network_lr=1e-6, value_network_lr=1e-6)
+  # model.save("a2c_cartpole")
+  
+
+  # logger.configure('./logs')  # Change to log in a different directory
   # act = deepq.learn(
   #   env,
   #   "cnn",  # For visual inputs
@@ -34,4 +48,8 @@ def main():
 
 
 if __name__ == '__main__':
-  main()
+  if len(sys.argv) > 1:
+    for arg in sys.argv[1:]:
+      if arg.startswith("--run-id="):
+        run_id = arg[9:]
+        main(run_id)
