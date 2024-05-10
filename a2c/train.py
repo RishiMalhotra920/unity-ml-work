@@ -3,6 +3,7 @@ from torch import nn
 import random
 import numpy as np
 
+
 def train(data, pi_network, v_network, gamma, pi_network_lr, v_network_lr, num_epochs, writer, step, save_path):
     # Define the loss functions
     pi_criterion = nn.MSELoss()
@@ -48,7 +49,6 @@ def train(data, pi_network, v_network, gamma, pi_network_lr, v_network_lr, num_e
 
                 actual_a1, actual_a2 = torch.tensor(a[0][0]), torch.tensor(a[0][1])
                 pi_a_given_s = torch.distributions.Normal(a1_mean, a1_var).log_prob(actual_a1) + torch.distributions.Normal(a2_mean, a2_var).log_prob(actual_a2)
-
                 # Adjusted return with baseline
                 adjusted_G = G - v_s.detach()  # detach v_s to avoid computing gradients for it
 

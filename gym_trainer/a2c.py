@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 import numpy as np
 import matplotlib.pyplot as plt
+from gym_trainer.rolloutbuffer import RolloutBuffer
+import torch.nn.functional as F
 
 class PolicyNetwork(nn.Module):
   def __init__(self, input_size, hidden_size, hidden_size2, num_means):
@@ -57,17 +59,20 @@ class MyA2C():
     self.policy_network = PolicyNetwork(8, 64, 64, 2)
     self.value_network = NeuralNet(8, 64, 64, 1)
     self.tb_writer = tb_writer
+    self.rollout_buffer = RolloutBuffer()
+    self.ep_len = 0
+    self.ep_rew = 0
   
-  def rollout(self, s0, start_step, n_steps, total_timesteps, log_interval):
+  def collect_rollouts(self, s0, start_step, n_steps, total_timesteps, log_interval):
     """
     n_steps: total number of steps to simulate
     """
 
     s_i = s0
     end = False
-    data = []
+
     step = start_step
-    a0s =[]
+    a0s = []
     a1s = []
     reward = 0
     log_interval_hit = False
@@ -84,16 +89,28 @@ class MyA2C():
 
       # print('this is s_i_prime', a_i, s_i_prime, r_i, end)
 
-      data.append((s_i, a_i, r_i, s_i_prime))
+      self.rollout_buffer.add(s_i, a_i, r_i, s_i_prime)
       a0s.append(a1.item())
       a1s.append(a2.item())
       
       reward += r_i
       step += 1
+      self.ep_len += 1
+      self.ep_rew += r_i
 
       if step % log_interval == 0:
         log_interval_hit = True
-
+    
+    if end:
+      next_rollout_start_state = self.env.reset()
+      self.tb_writer.add_scalar('rollout/ep_rew_mean', self.ep_rew/self.ep_len, step)
+      self.tb_writer.add_scalar('rollout/ep_len_mean', self.ep_len, step)
+      self.ep_rew = 0
+      self.ep_len = 0
+    else:
+      next_rollout_start_state = s_i_prime
+      
+    self.rollout_buffer.set_end(end)
 
     if log_interval_hit:
       # Create a scatter plot
@@ -105,54 +122,65 @@ class MyA2C():
 
       
       # Add the figure to TensorBoard
-      self.tb_writer.add_scalar('rollout/ep_rew_mean', reward/len(data), step)
-      self.tb_writer.add_scalar('rollout/ep_len_mean', len(data), step)
       self.tb_writer.add_figure('rollout/actions', fig, global_step=step)
+
     
-    return data, end, step, log_interval_hit
+    return step, next_rollout_start_state, log_interval_hit
   
-  def learn(self, gamma=0.99, n_steps=60, total_timesteps=1000, ent_coef=10e-4, policy_network_lr=7e-4, value_network_lr=7e-4, log_interval=100):
-    # print('this is s0', s0)
-    # TODO: n_steps is wrong here. we need to batch it up and learn as a batch.
-    print('lr', policy_network_lr, value_network_lr)
+  # the rollout approach needs to be more sophisticated.
+# you rollout 5 steps with pi, then update pi and v with the rollout
+# then rollout 5 more steps from the last step with pi, then update pi and v with the rollout
+# repeat until you reach the end of the trajectory, then keep going until you hit num_steps.
+# tomorrow it will take 2-3 hours to code this out but you can get it done.
+
+  def learn(self, gamma=0.99, n_steps=5, total_timesteps=1000, ent_coef=10e-4, policy_network_lr=7e-4, value_network_lr=7e-4, log_interval=100):
+
     policy_network_optim = torch.optim.RMSprop(self.policy_network.parameters(), lr=policy_network_lr)
     value_network_optim = torch.optim.RMSprop(self.value_network.parameters(), lr=value_network_lr)
     step = 0
+    s0 = self.env.reset()
+
     while step < total_timesteps:
-      s0 = self.env.reset()
-      data, end, step, log_interval_hit = self.rollout(s0, step, n_steps, total_timesteps, log_interval)
-
-      if end:
-        R = 0
+      
+      self.rollout_buffer.reset()
+      step, next_rollout_start_state, log_interval_hit = self.collect_rollouts(s0, step, n_steps, total_timesteps, log_interval)
+      s0 = next_rollout_start_state
+      
+      if self.rollout_buffer.get_end():
+        R = torch.tensor([0])
       else:
-        s_terminal = data[-1][-1]
-        R = self.value_network(s_terminal)
+        s_last = self.rollout_buffer.get_last_state()
+        R = self.value_network(torch.tensor(s_last))
 
-      value_loss = 0 
+      value_loss = 0
       policy_loss = 0
       sigma_a1s = 0
       sigma_a2s = 0
       total_entropy_bonus = 0
-      for i in range(len(data)-1, -1, -1):
-        # print('this is data[i]', data[i])
-        s_i, (a1_i, a2_i), r_i, s_i_prime = data[i]
-
+      for i in range(len(self.rollout_buffer)-1, -1, -1):
+        # print('this is self.rollout_buffer[i]', self.rollout_buffer[i])
+        s_i, (a1_i, a2_i), r_i, s_i_prime = self.rollout_buffer[i]
+        
+        R = R.detach()
+        # treat the value function as an oracle and do not backprop through it when calculating the policy loss.
         R = r_i + gamma * R
+        print('this is R', R)
         a_i = self.policy_network(torch.tensor(s_i))
         v = self.value_network(torch.tensor(s_i))
 
         (mu_a1, mu_a2), (sigma_a1, sigma_a2) = a_i
         print('this is mu_a1, mu_a2', mu_a1, mu_a2, sigma_a1, sigma_a2)
         log_prob = torch.distributions.Normal(mu_a1, sigma_a1).log_prob(a1_i) + torch.distributions.Normal(mu_a2, sigma_a2).log_prob(a2_i)
-        advantage = R - v
+        advantage = R - v.detach()
         entropy_bonus = 0.5 * (torch.log(2*torch.pi*(sigma_a1+sigma_a2)**2) + 1)
+        print('this is advantage', advantage)
         policy_network_loss = -(log_prob * advantage) - ent_coef * entropy_bonus #reduce the loss for high entropy.
-        
-        value_network_loss = (advantage**2)
+
+        value_network_loss = F.mse_loss(R, v)
         print('logging 1: ', log_prob, advantage, policy_network_loss, advantage)
         print('logging 2: ', v, R, value_network_loss, advantage)
         policy_network_optim.zero_grad()
-        policy_network_loss.backward(retain_graph=True)
+        policy_network_loss.backward()
         policy_network_optim.step()
         
         value_network_optim.zero_grad()
@@ -167,11 +195,11 @@ class MyA2C():
         self.tb_writer.add_scalar('train/advantage', advantage, step)
         
       if log_interval_hit:
-        self.tb_writer.add_scalar('train/policy_loss', policy_loss/len(data), step)
-        self.tb_writer.add_scalar('train/value_loss', value_loss/len(data), step)
-        self.tb_writer.add_scalar('train/sigma_a1s', sigma_a1s/len(data), step)
-        self.tb_writer.add_scalar('train/sigma_a2s', sigma_a1s/len(data), step)
-        self.tb_writer.add_scalar('train/entropy_bonus', total_entropy_bonus/len(data), step)
+        self.tb_writer.add_scalar('train/policy_loss', policy_loss/len(self.rollout_buffer), step)
+        self.tb_writer.add_scalar('train/value_loss', value_loss/len(self.rollout_buffer), step)
+        self.tb_writer.add_scalar('train/sigma_a1s', sigma_a1s/len(self.rollout_buffer), step)
+        self.tb_writer.add_scalar('train/sigma_a2s', sigma_a1s/len(self.rollout_buffer), step)
+        self.tb_writer.add_scalar('train/entropy_bonus', total_entropy_bonus/len(self.rollout_buffer), step)
         
 
 
