@@ -23,7 +23,7 @@ def main(run_id):
   print('hi', vec_env._observation_space, isinstance(vec_env.action_space, gym.spaces.Box), vec_env.action_space)
   writer = SummaryWriter(f"runs/{run_id}")
   print('run id: ', run_id)
-
+ 
   model = MyA2C(vec_env, writer, n_steps=10)
   model.learn(total_timesteps=25000, policy_network_lr=7e-4, value_network_lr=7e-4)
   # model.save("a2c_cartpole")
