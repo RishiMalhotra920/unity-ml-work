@@ -10,17 +10,22 @@ from mlagents_envs.environment import UnityEnvironment
 from mlagents_envs.envs.unity_gym_env import UnityToGymWrapper
 from torch.utils.tensorboard import SummaryWriter
 import sys
-
+import torch
+import numpy as np
+import random
 def main(run_id):
   # unity_env = UnityEnvironment("/Users/rishimalhotra/projects/checker2_one_agent.app")
   unity_env = UnityEnvironment()
+  torch.manual_seed(0)
+  np.random.seed(0)
+  random.seed(0)
   vec_env = UnityToGymWrapper(unity_env, uint8_visual=True)
   print('hi', vec_env._observation_space, isinstance(vec_env.action_space, gym.spaces.Box), vec_env.action_space)
   writer = SummaryWriter(f"runs/{run_id}")
   print('run id: ', run_id)
 
-  model = MyA2C(vec_env, writer)
-  model.learn(total_timesteps=25000, policy_network_lr=1e-6, value_network_lr=1e-6)
+  model = MyA2C(vec_env, writer, n_steps=10)
+  model.learn(total_timesteps=25000, policy_network_lr=7e-4, value_network_lr=7e-4)
   # model.save("a2c_cartpole")
   
 

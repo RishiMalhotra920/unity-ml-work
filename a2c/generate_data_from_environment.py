@@ -1,7 +1,7 @@
 import numpy as np
 from mlagents_envs.base_env import ActionTuple
 
-
+# make sure it's s and s'
 def generate_data_from_environment(policy, env, num_agents, num_episodes_per_agent, max_episode_length, writer, step, save_path):
   """
   num_episodes (int): The number of episodes to collect data for.
