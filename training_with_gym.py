@@ -28,9 +28,10 @@ def main(run_id):
   checkpoint_path = Path(f"checkpoints/{run_id}")
   checkpoint_path.mkdir(parents=True, exist_ok=True)
 
-  model = MyA2C(vec_env, writer, n_steps=10)
+  model = MyA2C(vec_env, writer, n_steps=15)
   model.learn(total_timesteps=25000, policy_network_lr=7e-4, value_network_lr=7e-4, sigma_lr=1e-4, ent_coef=10e-6, checkpoint_path=checkpoint_path)
   vec_env.close()
+  # model was getting better!
   # model.save("a2c_cartpole")
   
 

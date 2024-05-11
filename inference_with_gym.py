@@ -24,12 +24,15 @@ def main():
 
 
   # avg length: 43.
-  policy_network_checkpoint_path = "checkpoints/using_log_exp_with_lower_lr_for_sigma/step_18003/policy_network.pth"
+  # policy_network_checkpoint_path = "good_checkpoints/using_log_exp_with_lower_lr_for_sigma/step_18003/policy_network.pth"
 
+  # avg length: 43.
+  policy_network_checkpoint_path = "good_checkpoints/increasing_n_steps_to_15/step_25000/policy_network.pth"
   model = MyA2C(vec_env, None, n_steps=10, policy_network_checkpoint_path=policy_network_checkpoint_path)
-  average_episode_length, std_episode_length = model.collect_rollouts_for_inference(num_episodes=100, deterministic=True)
+  average_episode_length, std_episode_length = model.collect_rollouts_for_inference(num_episodes=20, deterministic=True)
   print('average episode length:', average_episode_length)
   # model.save("a2c_cartpole")
+  vec_env.close()
   
 
 
