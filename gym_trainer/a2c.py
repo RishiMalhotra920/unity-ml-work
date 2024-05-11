@@ -22,15 +22,22 @@ class PolicyNetwork(nn.Module):
       nn.ReLU(),
       nn.Linear(hidden_size2, num_means)
     )
-    self.sigma_param = nn.Parameter(torch.ones(num_means) * log_std_init)  # Initialize sigma
+    self.sigma_network = nn.Sequential(
+      nn.Linear(input_size, hidden_size),
+      nn.ReLU(),
+      nn.Linear(hidden_size, num_means),
+    )
+    # self.sigma_param = nn.Parameter(torch.ones(num_means) * log_std_init)  # Initialize sigma
     
     # self.softplus = nn.exp()
   
   def forward(self, x):
 
     mu_out = self.mu_network(x)
-    sigma_out = torch.exp(self.sigma_param)
-    sigma_out = sigma_out.expand_as(mu_out)
+    sigma_out = self.sigma_network(x)
+    sigma_out = torch.exp(sigma_out)
+    # sigma_out = torch.exp(self.sigma_param)
+    # sigma_out = sigma_out.expand_as(mu_out)
     # print('sout', sigma_out)
 
     return mu_out, sigma_out
@@ -168,9 +175,11 @@ class MyA2C():
   def learn(self, *, checkpoint_path, gamma=0.99, total_timesteps=1000, ent_coef=10e-4, policy_network_lr=7e-4, value_network_lr=7e-4, sigma_lr=1e-4,log_interval=100, max_grad_norm=0.5):
 
     # print('params', list(self.policy_network.parameters()))
-
+    
+    # could have also added value params here into one optimizer.
+    # then wouldn't have to clear twice.
     policy_network_optim = torch.optim.RMSprop([
-      {'params': self.policy_network.sigma_param, 'lr': sigma_lr},
+      {'params': self.policy_network.sigma_network.parameters(), 'lr': policy_network_lr},
       {'params': self.policy_network.mu_network.parameters(), 'lr': policy_network_lr}
     ])
     value_network_optim = torch.optim.RMSprop(self.value_network.parameters(), lr=value_network_lr)
@@ -210,7 +219,7 @@ class MyA2C():
       policy_network_optim.zero_grad()
       policy_loss.backward()
       torch.nn.utils.clip_grad_norm_(self.policy_network.parameters(), max_grad_norm)
-      print('sigma param', sigma_a1, sigma_a2, '\nsigma grad', self.policy_network.sigma_param.grad)
+      print('sigma param', sigma_a1, sigma_a2)
       policy_network_optim.step()
 
       value_network_optim.zero_grad()
