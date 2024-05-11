@@ -13,6 +13,7 @@ import sys
 import torch
 import numpy as np
 import random
+from pathlib import Path 
 def main(run_id):
   # unity_env = UnityEnvironment("/Users/rishimalhotra/projects/checker2_one_agent.app")
   unity_env = UnityEnvironment()
@@ -23,9 +24,13 @@ def main(run_id):
   print('hi', vec_env._observation_space, isinstance(vec_env.action_space, gym.spaces.Box), vec_env.action_space)
   writer = SummaryWriter(f"runs/{run_id}")
   print('run id: ', run_id)
- 
+
+  checkpoint_path = Path(f"checkpoints/{run_id}")
+  checkpoint_path.mkdir(parents=True, exist_ok=True)
+
   model = MyA2C(vec_env, writer, n_steps=10)
-  model.learn(total_timesteps=25000, policy_network_lr=7e-4, value_network_lr=7e-4)
+  model.learn(total_timesteps=25000, policy_network_lr=7e-4, value_network_lr=7e-4, sigma_lr=1e-4, ent_coef=10e-6, checkpoint_path=checkpoint_path)
+  vec_env.close()
   # model.save("a2c_cartpole")
   
 
