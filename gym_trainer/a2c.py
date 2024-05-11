@@ -128,17 +128,17 @@ class MyA2C():
       
     self.rollout_buffer.set_end(end)
 
-    if log_interval_hit:
+    # if log_interval_hit:
       # Create a scatter plot
-      fig, ax = plt.subplots()
-      ax.scatter(a0s, a1s)
-      ax.set_title('Action Scatter Plot')
-      ax.set_xlabel('Action 0')
-      ax.set_ylabel('Action 1')
+      # fig, ax = plt.subplots()
+      # ax.scatter(a0s, a1s)
+      # ax.set_title('Action Scatter Plot')
+      # ax.set_xlabel('Action 0')
+      # ax.set_ylabel('Action 1')
 
       # create this for 100s of actions
       # Add the figure to TensorBoard
-      self.tb_writer.add_figure('rollout/actions', fig, global_step=step)
+      # self.tb_writer.add_figure('rollout/actions', fig, global_step=step)
 
     
     return step, next_rollout_start_state, log_interval_hit
@@ -172,6 +172,23 @@ class MyA2C():
 # repeat until you reach the end of the trajectory, then keep going until you hit num_steps.
 # tomorrow it will take 2-3 hours to code this out but you can get it done.
 
+  def get_sigma(self, step):
+    """
+    """
+    schedule = {
+      0: 1.0,
+      5000: 0.7,
+      10000: 0.3,
+      15000: 0.1,
+      20000: 0.01
+    }
+    
+    for k, v in schedule.items():
+      if step >= k:
+        sigma = v
+    
+    return torch.tensor(sigma)
+
   def learn(self, *, checkpoint_path, gamma=0.99, total_timesteps=1000, ent_coef=10e-4, policy_network_lr=7e-4, value_network_lr=7e-4, sigma_lr=1e-4,log_interval=100, max_grad_norm=0.5):
 
     # print('params', list(self.policy_network.parameters()))
@@ -196,22 +213,24 @@ class MyA2C():
       
       states, actions, rewards, s_primes, returns, end = self.rollout_buffer.get_rollout_tensors()
       # print('this is states', states)
-      mus, sigmas = self.policy_network(states)
+      mus, _ = self.policy_network(states)
       mu_a1, mu_a2 = mus[:, 0], mus[:, 1]
-      sigma_a1, sigma_a2 = sigmas[:, 0], sigmas[:, 1]
+      # sigma_a1, sigma_a2 = sigmas[:, 0], sigmas[:, 1]
 
       # print('this is mu_a1, mu_a2', mu_a1, mu_a2, sigma_a1, sigma_a2)
       v = self.value_network(states).reshape(-1)
       # print('this is v', v)
 
+      sigma_a1 = sigma_a2 = self.get_sigma(step)
+
       log_probs = torch.distributions.Normal(mu_a1, sigma_a1).log_prob(actions[:, 0]) + \
                   torch.distributions.Normal(mu_a2, sigma_a2).log_prob(actions[:, 1])
 
       advantages = returns - v.detach()
-      entropy_loss_a1 = -0.5 * (torch.log(2*torch.pi*(sigma_a1)**2) + 1).mean() #negated the entropy loss
-      entropy_loss_a2 = -0.5 * (torch.log(2*torch.pi*(sigma_a2)**2) + 1).mean() #negated the entropy loss
+      # entropy_loss_a1 = -0.5 * (torch.log(2*torch.pi*(sigma_a1)**2) + 1).mean() #negated the entropy loss
+      # entropy_loss_a2 = -0.5 * (torch.log(2*torch.pi*(sigma_a2)**2) + 1).mean() #negated the entropy loss
       log_prob_advantages = -(log_probs * advantages).mean()
-      policy_loss = log_prob_advantages + ent_coef * (entropy_loss_a1 + entropy_loss_a2) #reduce the loss for high entropy.
+      policy_loss = log_prob_advantages #+ ent_coef * (entropy_loss_a1 + entropy_loss_a2) #reduce the loss for high entropy.
       # print('this is value_loss', returns, v)
       value_loss = F.mse_loss(returns, v)
       # visualize value as a function of the ball position.
@@ -233,7 +252,7 @@ class MyA2C():
         self.tb_writer.add_scalar('train/value_loss', value_loss, step)
         self.tb_writer.add_scalar('train/sigma_a1s', sigma_a1.mean(), step)
         self.tb_writer.add_scalar('train/sigma_a2s', sigma_a2.mean(), step)
-        self.tb_writer.add_scalar('train/entropy_loss', entropy_loss_a1 + entropy_loss_a2, step)
+        # self.tb_writer.add_scalar('train/entropy_loss', entropy_loss_a1 + entropy_loss_a2, step)
         
         (checkpoint_path / f"step_{step}").mkdir(parents=True, exist_ok=True)
 
