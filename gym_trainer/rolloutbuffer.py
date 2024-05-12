@@ -1,6 +1,60 @@
 import numpy as np
 import torch 
 
+class Rollouts:
+  def __init__(self, num_rollouts, buffer_size, state_dim, action_dim):
+    self.num_rollouts = num_rollouts
+    self.buffer_size = buffer_size
+    self.state_dim = state_dim
+    self.action_dim = action_dim
+    self.rollouts = [RolloutBuffer(buffer_size, state_dim, action_dim) for _ in range(num_rollouts)]
+  
+  def add(self, rollout_idx, state, action, reward, state_prime):
+    self.rollouts[rollout_idx].add(state, action, reward, state_prime)
+  
+  def set_end(self, rollout_idx, end):
+    self.rollouts[rollout_idx].set_end(end)
+  
+  def get_rollout_tensors(self):
+    states = []
+    actions = []
+    rewards = []
+    s_primes = []
+    returns = []
+    ends = []
+    for r in self.rollouts:
+      s, a, r, s_prime, ret, end = r.get_rollout_tensors()
+      states.append(s)
+      actions.append(a)
+      rewards.append(r)
+      s_primes.append(s_prime)
+      returns.append(ret)
+      ends.append(end)
+    return (
+      torch.cat(states),
+      torch.cat(actions),
+      torch.cat(rewards),
+      torch.cat(s_primes),
+      torch.cat(returns),
+      ends
+    )
+
+  def compute_returns(self, value_network, gamma):
+    for r in self.rollouts:
+      r.compute_returns(value_network, gamma)
+  
+  def reset(self):
+    for r in self.rollouts:
+      r.reset()
+  
+  def write(self):
+    with open('rollouts.txt', 'w') as f:
+      for i, r in enumerate(self.rollouts):
+        f.write(f'\n-----------Rollout {i}----------------\n')
+        f.write(str(r))
+
+        
+
 class RolloutBuffer:
   def __init__(self, buffer_size, state_dim, action_dim):
     self.buffer_size = buffer_size
@@ -53,9 +107,7 @@ class RolloutBuffer:
       self.returns[i] = G
 
 
-  def get_rollouts(self):
-    return self.states[:self.pos], self.actions[:self.pos], self.rewards[:self.pos], self.s_primes[:self.pos], self.returns[:self.pos], self.end
-  
+
   def get_rollout_tensors(self):
     return (
       torch.tensor(self.states[:self.pos]),
@@ -81,3 +133,9 @@ class RolloutBuffer:
       self.returns[key],
       self.end
     )
+  def __str__(self):
+    s = ""
+    for i in range(self.pos):
+      s += f"----\nstate: {self.states[i]}\naction: {self.actions[i]}\nreward: {self.rewards[i]}\ns_prime: {self.s_primes[i]}\nreturn: {self.returns[i]}\n----\n"
+
+    return s

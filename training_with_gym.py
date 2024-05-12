@@ -34,8 +34,18 @@ def main(run_id):
   checkpoint_path = Path(f"checkpoints/{run_id}")
   checkpoint_path.mkdir(parents=True, exist_ok=True)
 
-  model = MyA2C(vec_env, writer, n_steps=20, load_policy_network_checkpoint_path=load_policy_network_checkpoint_path, load_value_network_checkpoint_path=load_value_network_checkpoint_path)
-  model.learn(total_timesteps=25000, policy_network_lr=7e-4, value_network_lr=7e-4, sigma_lr=1e-4, ent_coef=10e-6, checkpoint_path=checkpoint_path)
+  model = MyA2C(vec_env, 
+                writer,
+                n_steps=15,
+                num_rollouts_per_update=10,
+                load_policy_network_checkpoint_path=load_policy_network_checkpoint_path,
+                load_value_network_checkpoint_path=load_value_network_checkpoint_path)
+  model.learn(total_timesteps=50000, 
+              policy_network_lr=7e-4, 
+              value_network_lr=7e-4, 
+              sigma_lr=1e-4, 
+              ent_coef=1e-2, 
+              checkpoint_path=checkpoint_path)
   vec_env.close()
   # model was getting better!
   # model.save("a2c_cartpole")
