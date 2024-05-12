@@ -25,10 +25,16 @@ def main(run_id):
   writer = SummaryWriter(f"runs/{run_id}")
   print('run id: ', run_id)
 
+
+  # load_policy_network_checkpoint_path = "good_checkpoints/increasing_n_steps_to_15/step_25000/policy_network.pth"
+  # load_value_network_checkpoint_path = "good_checkpoints/increasing_n_steps_to_15/step_25000/value_network.pth"
+  load_policy_network_checkpoint_path = None
+  load_value_network_checkpoint_path = None
+
   checkpoint_path = Path(f"checkpoints/{run_id}")
   checkpoint_path.mkdir(parents=True, exist_ok=True)
 
-  model = MyA2C(vec_env, writer, n_steps=15)
+  model = MyA2C(vec_env, writer, n_steps=20, load_policy_network_checkpoint_path=load_policy_network_checkpoint_path, load_value_network_checkpoint_path=load_value_network_checkpoint_path)
   model.learn(total_timesteps=25000, policy_network_lr=7e-4, value_network_lr=7e-4, sigma_lr=1e-4, ent_coef=10e-6, checkpoint_path=checkpoint_path)
   vec_env.close()
   # model was getting better!

@@ -63,14 +63,19 @@ class NeuralNet(nn.Module):
 
 
 class MyA2C():
-  def __init__(self, env, tb_writer, n_steps, policy_network_checkpoint_path=None):
+  def __init__(self, env, tb_writer, n_steps, load_policy_network_checkpoint_path=None, load_value_network_checkpoint_path=None):
     self.env = env
     # print("action and observation shapes", env.action_space.shape, env)
     self.policy_network = PolicyNetwork(8, 64, 64, 2)
-    # load policy network weihgts
-    if policy_network_checkpoint_path:
-      self.policy_network.load_state_dict(torch.load(policy_network_checkpoint_path))
     self.value_network = NeuralNet(8, 64, 64, 1)
+    # load policy network weihgts
+    if load_policy_network_checkpoint_path:
+      self.policy_network.load_state_dict(torch.load(load_policy_network_checkpoint_path))
+    
+    if load_value_network_checkpoint_path:
+      self.value_network.load_state_dict(torch.load(load_value_network_checkpoint_path))
+
+    
     self.tb_writer = tb_writer
     self.rollout_buffer = RolloutBuffer(buffer_size=n_steps, state_dim=8, action_dim=2)
     self.ep_len = 0
@@ -182,7 +187,9 @@ class MyA2C():
       15000: 0.1,
       20000: 0.01
     }
-    
+    # schedule = {
+    #   0: 0.1
+    # }
     for k, v in schedule.items():
       if step >= k:
         sigma = v
