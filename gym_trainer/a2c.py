@@ -157,19 +157,20 @@ class MyA2C():
       end = False
       step = 0
       while not end:
-        (mu_a1, mu_a2), (sigma_a1, sigma_a2) = self.policy_network(torch.tensor(s_i))
+        (mu_a1, mu_a2), sigma = self.policy_network(torch.tensor(s_i))
         if deterministic:
           a1 = mu_a1.detach().numpy().clip(-1, 1)
           a2 = mu_a2.detach().numpy().clip(-1, 1)
         else:
-          a1 = torch.distributions.Normal(mu_a1, sigma_a1).sample().numpy().clip(-1, 1)
-          a2 = torch.distributions.Normal(mu_a2, sigma_a2).sample().numpy().clip(-1, 1)
+          a1 = torch.distributions.Normal(mu_a1, sigma).sample().numpy().clip(-1, 1)
+          a2 = torch.distributions.Normal(mu_a2, sigma).sample().numpy().clip(-1, 1)
         a_i = np.array([a1, a2])
         s_i_prime, r_i, end, _ = self.env.step(a_i)
         s_i = s_i_prime
         step += 1
       episode_lengths.append(step)
     return np.mean(episode_lengths), np.std(episode_lengths)
+
   
   # the rollout approach needs to be more sophisticated.
 # you rollout 5 steps with pi, then update pi and v with the rollout
