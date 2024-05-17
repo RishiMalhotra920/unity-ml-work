@@ -1,9 +1,8 @@
 
-from a2c.generate_data_from_environment import generate_data_from_environment
-from a2c.train import train
+from generate_data_from_environment import generate_data_from_environment
 from pathlib import Path
-from a2c.inference import epsilon_greedy_infer, infer
-from a2c.model import load_pi_network
+from inference import infer
+from model import load_pi_network
 from mlagents_envs.environment import UnityEnvironment
 import torch
 import numpy as np

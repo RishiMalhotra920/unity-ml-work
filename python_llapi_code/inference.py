@@ -1,4 +1,4 @@
-from a2c.model import pi_network
+from model import pi_network
 import numpy as np
 import torch
 

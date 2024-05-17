@@ -1,4 +1,4 @@
-from a2c.neural_net import NeuralNet, PiNetwork
+from neural_net import NeuralNet, PiNetwork
 import torch
 
 # NUM_ACTIONS = 32*32
