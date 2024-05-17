@@ -71,6 +71,9 @@ class Environment:
     reset the full environment
     """
     self.unity_env.reset()
+    observation, _, _, info = self._get_next_step_data()
+    return observation, info
+    
 
   def reset_agent(self, agent_id):
     """
@@ -79,8 +82,10 @@ class Environment:
     self.unity_env.set_action_for_agent(self.behavior_name, 
                                         agent_id,
                                         ActionTuple(continuous=self.reset_action))
-    
-  
+
+    return self._get_next_step_data_for_one_agent(agent_id)
+
+
   def step_agent(self, agent_id, action):
     """
     step one agent
@@ -96,25 +101,8 @@ class Environment:
     """
     
     self.unity_env.set_action_for_agent(self.behavior_name, agent_id, ActionTuple(action))
+    return self._get_next_step_data_for_one_agent(agent_id)
     
-    decision_steps, terminal_steps = self.unity_env.get_steps(self.behavior_name)
-
-    decision_step = decision_steps.get(agent_id, None)
-    
-    if decision_step:
-      observation = decision_step.obs[0]
-      reward = decision_step.reward
-      terminated = np.float32(1)
-    else:
-      terminal_step = terminal_steps.get(agent_id, None)
-      observation = terminal_step.obs[0]
-      reward = terminal_step.reward
-      terminated = np.float32(0)
-
-
-    return observation, reward, terminated, {}
-    
-
 
   def step(self, actions):
     """
@@ -130,6 +118,34 @@ class Environment:
       infos (dict): additional information for all agents. contains the agent_id as the key and the info as the value
     """
     self.unity_env.set_actions(self.behavior_name, ActionTuple(actions))
+    
+    return self._get_next_step_data()
+
+
+  def _get_next_step_data_for_one_agent(self, agent_id):
+    """
+    given decision_steps and terminal_steps, return the observations, rewards, terminated and infos for one agent
+    """
+    decision_steps, terminal_steps = self.unity_env.get_steps(self.behavior_name)
+
+    decision_step = decision_steps.get(agent_id, None)
+    
+    if decision_step:
+      observation = decision_step.obs[0]
+      reward = decision_step.reward
+      terminated = np.float32(1)
+    else:
+      terminal_step = terminal_steps.get(agent_id, None)
+      observation = terminal_step.obs[0]
+      reward = terminal_step.reward
+      terminated = np.float32(0)
+
+    return observation, reward, terminated, {}
+
+  def _get_next_step_data(self):
+    """
+    given decision_steps and terminal_steps, return the observations, rewards, terminated and infos for all agents
+    """
     decision_steps, terminal_steps = self.unity_env.get_steps(self.behavior_name)
 
     observations = np.zeros((self.num_agents, *self.observation_space.shape))
@@ -138,17 +154,12 @@ class Environment:
     terminated = np.zeros((self.num_agents, 1))
     infos = {}
     for agent_id, decision_step in decision_steps.items():
-      
-      
-      
       observations[agent_id] = decision_step.obs[0]
-
       rewards[agent_id] = decision_step.reward
       terminated[agent_id] = 0
       infos[agent_id] = {}
     
     for agent_id, terminal_step in terminal_steps.items():
-
       observations[agent_id] = terminal_step.obs[0]
       rewards[agent_id] = terminal_step.reward
       terminated[agent_id] = 1
