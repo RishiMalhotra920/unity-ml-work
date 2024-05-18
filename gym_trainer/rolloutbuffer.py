@@ -21,14 +21,18 @@ class Rollouts:
     rewards = []
     s_primes = []
     returns = []
+    values = []
+    advantages = []
     ends = []
     for r in self.rollouts:
-      s, a, r, s_prime, ret, end = r.get_rollout_tensors()
+      s, a, r, s_prime, ret, val, adv, end = r.get_rollout_tensors()
       states.append(s)
       actions.append(a)
       rewards.append(r)
       s_primes.append(s_prime)
       returns.append(ret)
+      values.append(val)
+      advantages.append(adv)
       ends.append(end)
     return (
       torch.cat(states),
@@ -36,6 +40,8 @@ class Rollouts:
       torch.cat(rewards),
       torch.cat(s_primes),
       torch.cat(returns),
+      torch.cat(values),
+      torch.cat(advantages),
       ends
     )
 
@@ -91,6 +97,8 @@ class RolloutBuffer:
     self.rewards = np.zeros((self.buffer_size), dtype=np.float32)
     self.s_primes = np.zeros((self.buffer_size, self.state_dim), dtype=np.float32)
     self.returns = np.zeros((self.buffer_size), dtype=np.float32)
+    self.values = np.zeros((self.buffer_size), dtype=np.float32)
+    self.advantages = np.zeros((self.buffer_size), dtype=np.float32)
     self.end = None
     self.pos = 0
   
@@ -102,9 +110,13 @@ class RolloutBuffer:
       s_last = self.get_last_state()
       G = value_network(torch.tensor(s_last)).detach().item()
 
+    # compute value for all tensors
+    self.values = value_network(torch.tensor(self.states)).detach().numpy().reshape(-1)
+
     for i in range(len(self.states)-1, -1, -1):
       G = self.rewards[i] + gamma * G
       self.returns[i] = G
+      self.advantages[i] = G - self.values[i]
 
 
 
@@ -115,6 +127,8 @@ class RolloutBuffer:
       torch.tensor(self.rewards[:self.pos]),
       torch.tensor(self.s_primes[:self.pos]),
       torch.tensor(self.returns[:self.pos]),
+      torch.tensor(self.values[:self.pos]),
+      torch.tensor(self.advantages[:self.pos]),
       self.end
     )
   
@@ -131,11 +145,13 @@ class RolloutBuffer:
       self.rewards[key],
       self.s_primes[key],
       self.returns[key],
+      self.values[key],
+      self.advantages[key],
       self.end
     )
   def __str__(self):
     s = ""
     for i in range(self.pos):
-      s += f"----\nstate: {self.states[i]}\naction: {self.actions[i]}\nreward: {self.rewards[i]}\ns_prime: {self.s_primes[i]}\nreturn: {self.returns[i]}\n----\n"
+      s += f"----\nstate: {self.states[i]}\naction: {self.actions[i]}\nreward: {self.rewards[i]}\ns_prime: {self.s_primes[i]}\nreturn: {self.returns[i]}\nadvantage:{self.advantages[i]}----\n"
 
     return s

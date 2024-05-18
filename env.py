@@ -75,15 +75,20 @@ class Environment:
     return observation, info
     
 
-  def reset_agent(self, agent_id):
-    """
-    reset the agent
-    """
-    self.unity_env.set_action_for_agent(self.behavior_name, 
-                                        agent_id,
-                                        ActionTuple(continuous=self.reset_action))
+  # def reset_agent(self, agent_id):
+  #   """
+  #   reset the agent
+  #   """
+  #   # somewhere need to track whether the agent's trajectory was reset
 
-    return self._get_next_step_data_for_one_agent(agent_id)
+  #   if self.agent_trajectory_cut_short[agent_id]:
+
+  #     self.unity_env.set_action_for_agent(self.behavior_name, 
+  #                                       agent_id,
+  #                                       ActionTuple(continuous=self.reset_action))
+
+  #   obs, _, _, info = self._get_next_step_data_for_one_agent(agent_id)
+  #   return obs, info
 
 
   def step_agent(self, agent_id, action):
@@ -99,8 +104,10 @@ class Environment:
       terminated: whether the episode is terminated
       info: additional information
     """
-    
+    action = action.reshape(1, self.action_space.shape[0])
+    print('this is action', action)
     self.unity_env.set_action_for_agent(self.behavior_name, agent_id, ActionTuple(action))
+    self.unity_env.step()
     return self._get_next_step_data_for_one_agent(agent_id)
     
 
@@ -117,8 +124,9 @@ class Environment:
       terminated (np.array(num_agents, 1)): whether the episode is terminated for all agents
       infos (dict): additional information for all agents. contains the agent_id as the key and the info as the value
     """
+    actions = actions.reshape(self.num_agents, self.action_space.shape[0])
     self.unity_env.set_actions(self.behavior_name, ActionTuple(actions))
-    
+    self.unity_env.step()
     return self._get_next_step_data()
 
 
@@ -128,17 +136,21 @@ class Environment:
     """
     decision_steps, terminal_steps = self.unity_env.get_steps(self.behavior_name)
 
+    
     decision_step = decision_steps.get(agent_id, None)
+    terminal_step = terminal_steps.get(agent_id, None)
+    print('decision_step', decision_step, 'terminal_step', terminal_step)
     
     if decision_step:
       observation = decision_step.obs[0]
       reward = decision_step.reward
-      terminated = np.float32(1)
+      terminated = np.bool_(False)
     else:
-      terminal_step = terminal_steps.get(agent_id, None)
       observation = terminal_step.obs[0]
       reward = terminal_step.reward
-      terminated = np.float32(0)
+      terminated = np.bool_(True)
+    
+    # print('observation.shape', observation.shape, 'reward.shape', reward.shape, 'terminated.shape', terminated.shape, 'info.shape', {})
 
     return observation, reward, terminated, {}
 
@@ -148,7 +160,7 @@ class Environment:
     """
     decision_steps, terminal_steps = self.unity_env.get_steps(self.behavior_name)
 
-    observations = np.zeros((self.num_agents, *self.observation_space.shape))
+    observations = np.zeros((self.num_agents, self.observation_space.shape[0]))
     
     rewards = np.zeros((self.num_agents, 1))
     terminated = np.zeros((self.num_agents, 1))
@@ -156,13 +168,13 @@ class Environment:
     for agent_id, decision_step in decision_steps.items():
       observations[agent_id] = decision_step.obs[0]
       rewards[agent_id] = decision_step.reward
-      terminated[agent_id] = 0
+      terminated[agent_id] = np.bool_(False)
       infos[agent_id] = {}
     
     for agent_id, terminal_step in terminal_steps.items():
       observations[agent_id] = terminal_step.obs[0]
       rewards[agent_id] = terminal_step.reward
-      terminated[agent_id] = 1
+      terminated[agent_id] = np.bool_(True)
       infos[agent_id] = {}
     
     return observations, rewards, terminated, infos
@@ -175,30 +187,43 @@ class Environment:
     
 
 if __name__ == "__main__":
+
   myenv = Environment(seed=42)
-  # test all methods above and log stuff
 
-  # test reset
-  print("testing reset")
-  myenv.reset()
+  # keep setting random actions for the agent
 
-  # test reset_agent
-  print("testing reset_agent")
-  myenv.reset_agent(2)
+  for i in range(1000):
+    # use step_agent
+    action = np.random.uniform(low=-1, high=1, size=(2))
+    observation, reward, terminated, info = myenv.step_agent(0, action)
+    print(observation, reward, terminated, info)
 
-  # test step_agent
-  print("testing step_agent")
-  action = np.array([[0.5, 0.5]])
-  observation, reward, terminated, info = myenv.step_agent(0, action)
-  print(observation, reward, terminated, info)
 
-  # test step with 12 agents
-  print("testing step")
-  actions = np.random.uniform(low=-1, high=1, size=(12, 2))
-  print('actions', actions)
-  observations, rewards, terminated, infos = myenv.step(actions)
-  print(observations, rewards, terminated, infos)
 
-  # test close
-  print("testing close")
-  myenv.close()
+  # myenv = Environment(seed=42)
+  # # test all methods above and log stuff
+
+  # # test reset
+  # print("testing reset")
+  # myenv.reset()
+
+  # # test reset_agent
+  # print("testing reset_agent")
+  # myenv.reset_agent(2)
+
+  # # test step_agent
+  # print("testing step_agent")
+  # action = np.array([[0.5, 0.5]])
+  # observation, reward, terminated, info = myenv.step_agent(0, action)
+  # print(observation, reward, terminated, info)
+
+  # # test step with 12 agents
+  # print("testing step")
+  # actions = np.random.uniform(low=-1, high=1, size=(12, 2))
+  # print('actions', actions)
+  # observations, rewards, terminated, infos = myenv.step(actions)
+  # print(observations, rewards, terminated, infos)
+
+  # # test close
+  # print("testing close")
+  # myenv.close()

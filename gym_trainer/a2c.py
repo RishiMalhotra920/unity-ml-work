@@ -221,7 +221,7 @@ class MyA2C():
 
       self.rollout_buffers.compute_returns(self.value_network, gamma)
       
-      states_batch, actions_batch, rewards_batch, s_primes_batch, returns_batch, end = self.rollout_buffers.get_rollout_tensors()
+      states_batch, actions_batch, rewards_batch, s_primes_batch, returns_batch, values_batch, advantages_batch, end = self.rollout_buffers.get_rollout_tensors()
 
       print('shapes:', states_batch.shape, actions_batch.shape, rewards_batch.shape, s_primes_batch.shape, returns_batch.shape, end)
       # print('this is states', states)
